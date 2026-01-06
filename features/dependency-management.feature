@@ -20,6 +20,12 @@ Feature: Dependency Management
     And the service should provide a helpful error message
     And the service should not start in a degraded state
 
+  Scenario: Auth handler dependency provided by bootstrap
+    Given I use the bootstrap auth security handlers
+    When I start my service
+    Then the required auth dependency should already be available
+    And I should not need to add it directly to my service
+
   Scenario: Dependency becomes unavailable during operation
     Given the service is running normally
     When a required service becomes unavailable

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import type { FirestoreEventStore } from '@emmett-community/emmett-google-firestore';
 import { createEventStore } from '../../../src/eventstore/EventStoreFactory';
 import { createInMemoryDatabase } from '../../helpers/inMemoryDatabase';
 import { createInMemoryFirestore } from '../../helpers/inMemoryFirestore';
@@ -36,5 +37,22 @@ void describe('EventStoreFactory - unit', () => {
     });
 
     assert.equal(typeof eventStore.appendToStream, 'function');
+  });
+
+  void it('passes custom collection names to Firestore event store', () => {
+    const firestore = createInMemoryFirestore();
+    const database = createInMemoryDatabase();
+
+    const eventStore = createEventStore<FirestoreEventStore>({
+      firestore,
+      database,
+      collections: {
+        streams: 'custom-streams',
+        counters: 'custom-counters',
+      },
+    });
+
+    assert.equal(eventStore.collections.streams, 'custom-streams');
+    assert.equal(eventStore.collections.counters, 'custom-counters');
   });
 });

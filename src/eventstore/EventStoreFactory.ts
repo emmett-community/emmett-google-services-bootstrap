@@ -1,4 +1,7 @@
-import { getFirestoreEventStore } from '@emmett-community/emmett-google-firestore';
+import {
+  getFirestoreEventStore,
+  type FirestoreEventStoreOptions,
+} from '@emmett-community/emmett-google-firestore';
 import {
   wireRealtimeDBProjections,
   type RealtimeDBInlineProjectionDefinition,
@@ -13,6 +16,7 @@ export type EventStoreFactoryOptions = {
   database: Database;
   projections?: RealtimeDBInlineProjectionDefinition[];
   logger?: Logger;
+  collections?: FirestoreEventStoreOptions['collections'];
 };
 
 /**
@@ -21,10 +25,13 @@ export type EventStoreFactoryOptions = {
 export const createEventStore = <T extends EventStore = EventStore>(
   options: EventStoreFactoryOptions,
 ): T => {
-  const { firestore, database, projections, logger } = options;
+  const { firestore, database, projections, logger, collections } = options;
   const observability = logger ? { logger } : undefined;
 
-  const baseEventStore = getFirestoreEventStore(firestore, { observability });
+  const baseEventStore = getFirestoreEventStore(firestore, {
+    observability,
+    collections,
+  });
 
   if (projections && projections.length > 0) {
     return wireRealtimeDBProjections({

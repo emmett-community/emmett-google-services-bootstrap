@@ -311,6 +311,7 @@ export class ServiceBootstrap {
         firestore,
         database,
         projections: resolvedConfig.projections,
+        collections: resolvedConfig.eventStore.collections,
         logger,
       });
 
@@ -554,6 +555,9 @@ export class ServiceBootstrap {
         timeoutMs: this.config.shutdown?.timeoutMs ?? 30000,
         exitOnComplete: this.config.shutdown?.exitOnComplete ?? false,
         exitFn: this.config.shutdown?.exitFn,
+      },
+      eventStore: {
+        collections: this.config.eventStore?.collections,
       },
       _testOverrides: this.config._testOverrides,
     };

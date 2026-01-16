@@ -1,5 +1,6 @@
 import type { SubscriptionOptions, PubSubMessageBusLifecycle } from '@emmett-community/emmett-google-pubsub';
 import type { RealtimeDBInlineProjectionDefinition } from '@emmett-community/emmett-google-realtime-db';
+import type { FirestoreEventStoreOptions } from '@emmett-community/emmett-google-firestore';
 import type {
   CommandProcessor,
   EventSubscription,
@@ -97,6 +98,9 @@ export type ServiceBootstrapConfig = {
   serviceName: string;
   firebase?: FirebaseConfig;
   pubsub?: PubSubConfig;
+  eventStore?: {
+    collections?: FirestoreEventStoreOptions['collections'];
+  };
   observability?: ObservabilityConfig;
   projections?: RealtimeDBInlineProjectionDefinition[];
   getCurrentTime?: () => Date;
@@ -129,6 +133,9 @@ export type ResolvedServiceBootstrapConfig = {
   serviceName: string;
   firebase: ResolvedFirebaseConfig;
   pubsub: ResolvedPubSubConfig;
+  eventStore: {
+    collections?: FirestoreEventStoreOptions['collections'];
+  };
   observability: ObservabilityConfig;
   projections: RealtimeDBInlineProjectionDefinition[];
   getCurrentTime: () => Date;

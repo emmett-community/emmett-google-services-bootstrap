@@ -106,6 +106,12 @@ const config: ServiceBootstrapConfig = {
     topicPrefix: 'user-service',
     autoCreateResources: true,
   },
+  eventStore: {
+    collections: {
+      streams: 'user-service-streams',
+      counters: '_user-service-counters',
+    },
+  },
   projections: [],
   observability: {
     createLogger: true,
@@ -116,6 +122,11 @@ const config: ServiceBootstrapConfig = {
   shutdownOnDependencyFailure: true,
 };
 ```
+
+### Event store collection names
+
+- `eventStore.collections.streams`: Firestore collection that stores stream metadata (defaults to `"streams"`).
+- `eventStore.collections.counters`: Firestore collection for shared counters (defaults to `"_counters"`).
 
 ## API
 

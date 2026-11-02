@@ -104,8 +104,10 @@ void describe('Event Store E2E', () => {
       { type: 'TestEventOccurred', data: { value: 'test' } },
     ]);
 
-    const events = await ctx.eventStore.readStream('test-stream-1');
+    const { events, streamExists } =
+      await ctx.eventStore.readStream('test-stream-1');
 
+    assert.equal(streamExists, true);
     assert.equal(events.length, 1);
     assert.equal(events[0]?.type, 'TestEventOccurred');
   });

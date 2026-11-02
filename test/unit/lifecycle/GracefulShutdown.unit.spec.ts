@@ -35,6 +35,36 @@ void describe('GracefulShutdown - unit', () => {
     assert.equal(exitCode, 0);
   });
 
+  void it('runs a task registered first before the ones already registered', async () => {
+    const calls: string[] = [];
+    const shutdown = new GracefulShutdown();
+
+    shutdown.register({
+      name: 'messageBus',
+      close: async () => {
+        calls.push('messageBus');
+      },
+    });
+
+    shutdown.register({
+      name: 'firestore',
+      close: async () => {
+        calls.push('firestore');
+      },
+    });
+
+    shutdown.registerFirst({
+      name: 'httpServer',
+      close: async () => {
+        calls.push('httpServer');
+      },
+    });
+
+    await shutdown.shutdown('test', 1);
+
+    assert.deepEqual(calls, ['httpServer', 'messageBus', 'firestore']);
+  });
+
   void it('propagates failures and uses provided exit code', async () => {
     let exitCode: number | undefined;
 

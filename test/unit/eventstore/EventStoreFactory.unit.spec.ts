@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import type { FirestoreEventStore } from '@emmett-community/emmett-google-firestore';
 import { createEventStore } from '../../../src/eventstore/EventStoreFactory';
 import { createInMemoryDatabase } from '../../helpers/inMemoryDatabase';
 import { createInMemoryFirestore } from '../../helpers/inMemoryFirestore';
@@ -39,11 +38,11 @@ void describe('EventStoreFactory - unit', () => {
     assert.equal(typeof eventStore.appendToStream, 'function');
   });
 
-  void it('passes custom collection names to Firestore event store', () => {
+  void it('passes custom collection names to Firestore event store', async () => {
     const firestore = createInMemoryFirestore();
     const database = createInMemoryDatabase();
 
-    const eventStore = createEventStore<FirestoreEventStore>({
+    const eventStore = createEventStore({
       firestore,
       database,
       collections: {
@@ -52,7 +51,34 @@ void describe('EventStoreFactory - unit', () => {
       },
     });
 
-    assert.equal(eventStore.collections.streams, 'custom-streams');
-    assert.equal(eventStore.collections.counters, 'custom-counters');
+    await eventStore.appendToStream('stream-1', [
+      { type: 'TestEvent', data: { value: 1 } },
+    ]);
+
+    const events = await firestore
+      .collection('custom-streams')
+      .doc('stream-1')
+      .collection('events')
+      .get();
+    const counters = await firestore.collection('custom-counters').get();
+
+    assert.equal(events.size, 1);
+    assert.equal(counters.size, 1);
+  });
+
+  void it('exposes the canonical event store contract', async () => {
+    const eventStore = createEventStore({
+      firestore: createInMemoryFirestore(),
+      database: createInMemoryDatabase(),
+    });
+
+    await eventStore.appendToStream('stream-1', [
+      { type: 'TestEvent', data: { value: 1 } },
+    ]);
+
+    const result = await eventStore.readStream('stream-1');
+
+    assert.equal(result.streamExists, true);
+    assert.equal(result.events.length, 1);
   });
 });

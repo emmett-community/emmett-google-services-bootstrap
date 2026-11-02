@@ -1,4 +1,5 @@
 import {
+  asEventStore,
   getFirestoreEventStore,
   type FirestoreEventStoreOptions,
 } from '@emmett-community/emmett-google-firestore';
@@ -28,19 +29,21 @@ export const createEventStore = <T extends EventStore = EventStore>(
   const { firestore, database, projections, logger, collections } = options;
   const observability = logger ? { logger } : undefined;
 
-  const baseEventStore = getFirestoreEventStore(firestore, {
-    observability,
-    collections,
-  });
+  const baseEventStore = asEventStore(
+    getFirestoreEventStore(firestore, {
+      observability,
+      collections,
+    }),
+  ) as unknown as T;
 
   if (projections && projections.length > 0) {
     return wireRealtimeDBProjections({
-      eventStore: baseEventStore as unknown as T,
+      eventStore: baseEventStore,
       database,
       projections,
       observability,
     }) as T;
   }
 
-  return baseEventStore as unknown as T;
+  return baseEventStore;
 };

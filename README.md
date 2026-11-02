@@ -87,6 +87,7 @@ await bootstrap.startApi({
 - `FIREBASE_DATABASE_EMULATOR_HOST`: Realtime DB emulator host
 - `PUBSUB_PROJECT_ID`: PubSub project id
 - `PUBSUB_EMULATOR_HOST`: PubSub emulator host
+- `PUBSUB_TOPIC_PREFIX`: prefix of topics and subscriptions (used when `pubsub.topicPrefix` is not set; defaults to the service name)
 - `LOG_LEVEL`: default log level for built-in logger
 - `NODE_ENV`: forwarded to logging helpers
 
@@ -104,6 +105,7 @@ const config: ServiceBootstrapConfig = {
   pubsub: {
     projectId: 'demo-project',
     topicPrefix: 'user-service',
+    subscriptionId: 'user-service',
     autoCreateResources: true,
   },
   eventStore: {
@@ -118,10 +120,20 @@ const config: ServiceBootstrapConfig = {
     logLevel: 'info',
   },
   includeDefaultDependencyChecks: true,
+  includeRealtimeDatabaseCheck: true,
   autoStartMessageBus: true,
   shutdownOnDependencyFailure: true,
 };
 ```
+
+### Subscriptions
+
+Event and command subscriptions are named after the service, so they survive restarts and the replicas of a service share them:
+
+- Events: `<topicPrefix>-evt-<EventType>-<subscriptionId>`. An event normally reaches one replica, but it can be delivered again, so handlers must be idempotent.
+- Commands: `<topicPrefix>-cmd-<CommandType>-<subscriptionId>`, so a command has one handler.
+
+`pubsub.subscriptionId` defaults to the service name. `includeRealtimeDatabaseCheck: false` leaves the Realtime Database out of the default dependency checks, for services that do not use it.
 
 ### Event store collection names
 
@@ -138,12 +150,44 @@ const config: ServiceBootstrapConfig = {
 - `shutdown(reason, exitCode?)` runs graceful shutdown tasks.
 - `registerSignalHandlers()` installs SIGINT/SIGTERM handlers.
 - `startApi()` initializes, runs checks, creates the app, and starts the HTTP server.
+- `checkReadiness()` runs the readiness checks (also available as `ctx.checkReadiness`).
+
+`ctx.eventStore` follows Emmett's `EventStore` contract: `readStream` returns `{ events, currentStreamVersion, streamExists }`.
+
+### Health and readiness
+
+The probes are routes of the service contract. Declare `GET /health` and `GET /ready` in the OpenAPI document and wire them to the handlers of the package:
+
+```typescript
+// handlers/health.ts: the module of x-eov-operation-handler: health
+import type { NextFunction, Request, Response } from 'express';
+import {
+  getHealth as health,
+  getReady as ready,
+  type ServiceBootstrapContext,
+} from '@emmett-community/emmett-google-services-bootstrap';
+
+let readyHandler: ReturnType<typeof ready>;
+
+// Called from the initializeHandlers option of startApi()/createApp()
+export const initializeHandlers = (ctx: ServiceBootstrapContext) => {
+  readyHandler = ready(ctx);
+};
+
+export const getHealth = health;
+export const getReady = (req: Request, res: Response, next: NextFunction) =>
+  readyHandler(req, res, next);
+```
+
+`/health` answers `200 { "status": "ok" }`. `/ready` answers `200 { "status": "ready", "checks": [...] }` when Firestore, the Realtime Database (unless `includeRealtimeDatabaseCheck` is `false`), the message bus and the configured `dependencies` answer, and `503 { "status": "unavailable", "checks": [...] }` otherwise. Each check has a 3 s timeout.
 
 ### Lifecycle utilities
 
 - `DependencyChecker` and `startDependency()` for health checks.
-- `GracefulShutdown` for ordered shutdown tasks.
+- `GracefulShutdown` for ordered shutdown tasks (`registerFirst()` adds a task that runs before the others).
 - `registerSignalHandlers()` to attach process signals.
+
+`startApi()` closes the HTTP server first, then the message bus, Firestore and the Firebase app.
 
 ## What this package intentionally does NOT do
 
@@ -153,6 +197,23 @@ const config: ServiceBootstrapConfig = {
 - Require any specific deployment model
 
 ## Testing
+
+`@emmett-community/emmett-google-services-bootstrap/testing` builds a service bootstrap on the in-memory Firestore, Realtime Database and Pub/Sub of the `/testing` entries of the platform libraries, with no emulator and no network. The event store, the projections and the message bus are the real ones:
+
+```typescript
+import { createTestServiceBootstrap } from '@emmett-community/emmett-google-services-bootstrap/testing';
+
+const { bootstrap, firestore, database, messageBus } = createTestServiceBootstrap({
+  serviceName: 'user-service',
+  projections: [userDetailsProjection],
+});
+
+const ctx = await bootstrap.start();
+```
+
+Use `overrides` to replace any piece, for example to share one `pubsub` between two services.
+
+To test this package:
 
 ```bash
 npm run test:unit

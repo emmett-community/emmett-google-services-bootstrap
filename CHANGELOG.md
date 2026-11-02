@@ -4,6 +4,27 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.4.0] - Unreleased
+
+### Added
+
+- Stable subscriptions: event subscriptions are named `<topicPrefix>-evt-<EventType>-<subscriptionId>` and command subscriptions `<topicPrefix>-cmd-<CommandType>-<subscriptionId>`. `pubsub.subscriptionId` defaults to the service name, so subscriptions survive restarts and the replicas of a service share them: an event normally reaches one replica, and a command has one handler.
+- `PUBSUB_TOPIC_PREFIX` environment variable for the topic prefix, used when `pubsub.topicPrefix` is not set. The default stays the service name.
+- `getHealth` and `getReady(ctx)` handlers for the `/health` and `/ready` operations of a service contract, and `ctx.checkReadiness()` / `ServiceBootstrap.checkReadiness()`. `/ready` answers 503 with the failed checks when a dependency does not answer, with a 3 s timeout per check.
+- `includeRealtimeDatabaseCheck` option (default `true`) to leave the Realtime Database out of the default dependency checks.
+- `GracefulShutdown.registerFirst()`.
+- `@emmett-community/emmett-google-services-bootstrap/testing` entry with `createTestServiceBootstrap`, a service bootstrap on the in-memory Firestore, Realtime Database and Pub/Sub of the platform libraries.
+
+### Changed
+
+- `startApi()` closes the HTTP server before the message bus, Firestore and the Firebase app.
+- The logger is passed to the message bus as is. The previous adapter inverted the arguments, so every message bus log record was malformed.
+- `ctx.eventStore` is wrapped with `asEventStore`, so `readStream` returns `{ events, currentStreamVersion, streamExists }` as Emmett's `EventStore` declares, instead of a plain array.
+- The Firestore dependency check reads a query on `_healthcheck` instead of a document, which the in-memory Firestore also supports.
+- Depends on `@emmett-community/emmett-google-pubsub` ^0.6.0, `@emmett-community/emmett-google-firestore` ^0.6.0, `@emmett-community/emmett-google-realtime-db` ^0.8.0 and `@emmett-community/emmett-expressjs-with-openapi` ^0.9.0.
+- The build splits shared code into a chunk, so the main and testing entries use the same classes.
+- Tests use the in-memory fakes of the platform libraries instead of their own key-value fakes.
+
 ## [0.3.0] - 2026-01-17
 
 ### Added

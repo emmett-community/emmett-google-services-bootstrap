@@ -91,6 +91,13 @@ export class GracefulShutdown {
   }
 
   /**
+   * Register a shutdown task that runs before the ones already registered.
+   */
+  registerFirst(task: ShutdownTask): void {
+    this.tasks.unshift(task);
+  }
+
+  /**
    * Execute all shutdown tasks and return the aggregated result.
    */
   async shutdown(reason: string, exitCode = 1): Promise<GracefulShutdownResult> {

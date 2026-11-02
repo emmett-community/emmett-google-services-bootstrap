@@ -1,6 +1,6 @@
 {
   "name": "@emmett-community/emmett-google-services-bootstrap",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
@@ -48,6 +48,16 @@
         "types": "./dist/index.d.cts",
         "default": "./dist/index.cjs"
       }
+    },
+    "./testing": {
+      "import": {
+        "types": "./dist/testing.d.ts",
+        "default": "./dist/testing.js"
+      },
+      "require": {
+        "types": "./dist/testing.d.cts",
+        "default": "./dist/testing.cjs"
+      }
     }
   },
   "main": "./dist/index.cjs",
@@ -57,10 +67,10 @@
     "dist"
   ],
   "dependencies": {
-    "@emmett-community/emmett-expressjs-with-openapi": "^0.8.0",
-    "@emmett-community/emmett-google-firestore": "^0.5.0",
-    "@emmett-community/emmett-google-pubsub": "^0.4.0",
-    "@emmett-community/emmett-google-realtime-db": "^0.7.0",
+    "@emmett-community/emmett-expressjs-with-openapi": "^0.9.0",
+    "@emmett-community/emmett-google-firestore": "^0.6.0",
+    "@emmett-community/emmett-google-pubsub": "^0.6.0",
+    "@emmett-community/emmett-google-realtime-db": "^0.8.0",
     "@emmett-community/emmett-observability": "^0.3.0",
     "@event-driven-io/emmett": "^0.39.0",
     "@google-cloud/pubsub": "^4.9.0",

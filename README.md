@@ -213,6 +213,18 @@ const ctx = await bootstrap.start();
 
 Use `overrides` to replace any piece, for example to share one `pubsub` between two services.
 
+For API tests, use `ApiSpecification` and `ApiE2ESpecification` from `@event-driven-io/emmett-expressjs` (install it in `devDependencies`, with the same version as `@event-driven-io/emmett`). They take the application right away, so wrap the one built by `createApp()` with `lazyApplication`, which this package re-exports:
+
+```typescript
+import { ApiSpecification, expectResponse } from '@event-driven-io/emmett-expressjs';
+import { lazyApplication } from '@emmett-community/emmett-google-services-bootstrap';
+
+const given = ApiSpecification.for(
+  () => getInMemoryEventStore(),
+  (eventStore) => lazyApplication(createTestApp(eventStore)),
+);
+```
+
 To test this package:
 
 ```bash

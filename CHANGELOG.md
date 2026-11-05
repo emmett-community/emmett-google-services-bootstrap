@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## [0.4.0] - Unreleased
+## [0.4.0] - 2026-11-04
 
 ### Added
 
@@ -14,6 +14,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - `includeRealtimeDatabaseCheck` option (default `true`) to leave the Realtime Database out of the default dependency checks.
 - `GracefulShutdown.registerFirst()`.
 - `@emmett-community/emmett-google-services-bootstrap/testing` entry with `createTestServiceBootstrap`, a service bootstrap on the in-memory Firestore, Realtime Database and Pub/Sub of the platform libraries.
+- `lazyApplication`, re-exported from `@emmett-community/emmett-expressjs-with-openapi`, to use the asynchronous `createApp`/`getApplication` with the test helpers of `@event-driven-io/emmett-expressjs`.
+
+### Removed
+
+- **Breaking:** the re-exports of the Express test helpers `ApiSpecification`, `ApiE2ESpecification`, `existingStream`, `expectNewEvents`, `expectResponse` and the type `TestRequest`. A re-export would bring `supertest` back to production. Import them from `@event-driven-io/emmett-expressjs`, installed in `devDependencies`.
 
 ### Changed
 

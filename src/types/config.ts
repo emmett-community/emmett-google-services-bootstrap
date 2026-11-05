@@ -44,7 +44,13 @@ export type FirebaseConfig = {
 export type PubSubConfig = {
   projectId?: string;
   emulatorHost?: string;
+  /** Prefix of topics and subscriptions. Defaults to `PUBSUB_TOPIC_PREFIX`, then the service name. */
   topicPrefix?: string;
+  /**
+   * Stable id of this service's subscriptions, shared by its replicas and kept across restarts.
+   * Defaults to the service name.
+   */
+  subscriptionId?: string;
   subscriptionOptions?: SubscriptionOptions;
   autoCreateResources?: boolean;
   cleanupOnClose?: boolean;
@@ -106,6 +112,8 @@ export type ServiceBootstrapConfig = {
   getCurrentTime?: () => Date;
   dependencies?: DependencyCheck[];
   includeDefaultDependencyChecks?: boolean;
+  /** Check the Realtime Database with the default checks. Set to `false` for services that do not use it. */
+  includeRealtimeDatabaseCheck?: boolean;
   autoStartMessageBus?: boolean;
   shutdownOnDependencyFailure?: boolean;
   shutdown?: GracefulShutdownConfig;
@@ -123,6 +131,7 @@ export type ResolvedPubSubConfig = {
   projectId: string;
   emulatorHost?: string;
   topicPrefix: string;
+  subscriptionId: string;
   subscriptionOptions?: SubscriptionOptions;
   autoCreateResources: boolean;
   cleanupOnClose: boolean;
@@ -141,6 +150,7 @@ export type ResolvedServiceBootstrapConfig = {
   getCurrentTime: () => Date;
   dependencies: DependencyCheck[];
   includeDefaultDependencyChecks: boolean;
+  includeRealtimeDatabaseCheck: boolean;
   autoStartMessageBus: boolean;
   shutdownOnDependencyFailure: boolean;
   shutdown: GracefulShutdownConfig;

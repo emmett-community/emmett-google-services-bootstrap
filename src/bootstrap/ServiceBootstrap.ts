@@ -9,10 +9,7 @@ import {
   type ImportedHandlerModules,
   type OpenApiValidatorOptions,
 } from '@emmett-community/emmett-expressjs-with-openapi';
-import {
-  getPubSubMessageBus,
-  type Logger as PubSubLogger,
-} from '@emmett-community/emmett-google-pubsub';
+import { getPubSubMessageBus } from '@emmett-community/emmett-google-pubsub';
 import type { EventStore } from '@event-driven-io/emmett';
 import type { Firestore } from '@google-cloud/firestore';
 import type { PubSub } from '@google-cloud/pubsub';
@@ -59,6 +56,11 @@ export type ServiceBootstrapContext = {
   logger?: BootstrapLogger;
   getCurrentTime: () => Date;
   config: ResolvedServiceBootstrapConfig;
+  /**
+   * Runs the readiness checks (the same dependencies the startup checks, without starting the
+   * message bus again). Used by the `/ready` handler.
+   */
+  checkReadiness: () => Promise<DependencyCheckSummary>;
 };
 
 /**
@@ -102,37 +104,7 @@ export type StartApiOptions = Omit<CreateAppOptions, 'initializeHandlers'> & {
   beforeStart?: (ctx: ServiceBootstrapContext) => void | Promise<void>;
 };
 
-const normalizeContext = (data: unknown): Record<string, unknown> => {
-  if (data === undefined || data === null) return {};
-  if (typeof data === 'object' && !Array.isArray(data)) {
-    return { ...(data as Record<string, unknown>) };
-  }
-  return { data };
-};
-
-const normalizeErrorContext = (error: unknown): Record<string, unknown> => {
-  if (error === undefined || error === null) return {};
-  if (error instanceof Error) return { err: error };
-  if (typeof error === 'object' && !Array.isArray(error)) {
-    return { ...(error as Record<string, unknown>) };
-  }
-  return { err: error };
-};
-
-const createPubSubLogger = (
-  logger?: BootstrapLogger,
-): PubSubLogger | undefined => {
-  if (!logger) return undefined;
-  // Adapter: PubSub logger expects (msg, data), canonical logger uses (context, msg).
-  const canonicalLogger = logger as any;
-  return {
-    debug: (msg, data) => canonicalLogger.debug(normalizeContext(data), msg),
-    info: (msg, data) => canonicalLogger.info(normalizeContext(data), msg),
-    warn: (msg, data) => canonicalLogger.warn(normalizeContext(data), msg),
-    error: (msg, error) =>
-      canonicalLogger.error(normalizeErrorContext(error), msg),
-  };
-};
+const READINESS_CHECK_TIMEOUT_MS = 3000;
 
 const resolvePath = (inputPath: string): string => {
   return path.isAbsolute(inputPath)
@@ -245,7 +217,8 @@ export class ServiceBootstrap {
 
       const server = startAPI(app, { port, logger });
 
-      this.getShutdownManager().register({
+      // Closed before everything else, so no request reaches a store that is already closing
+      this.getShutdownManager().registerFirst({
         name: 'httpServer',
         close: () =>
           new Promise<void>((resolve, reject) => {
@@ -321,11 +294,15 @@ export class ServiceBootstrap {
         pubsub,
         useEmulator: pubsubInitializer.isEmulatorMode(),
         topicPrefix: resolvedConfig.pubsub.topicPrefix,
+        // Event subscriptions are shared by the replicas of the service and survive restarts
+        subscriptionId: resolvedConfig.pubsub.subscriptionId,
+        // Command subscriptions are shared too, so a command has one handler
+        instanceId: resolvedConfig.pubsub.subscriptionId,
         subscriptionOptions: resolvedConfig.pubsub.subscriptionOptions,
         autoCreateResources: resolvedConfig.pubsub.autoCreateResources,
         cleanupOnClose: resolvedConfig.pubsub.cleanupOnClose,
         closePubSubClient: resolvedConfig.pubsub.closePubSubClient,
-        observability: { logger: createPubSubLogger(logger) },
+        observability: { logger },
       });
 
     this.shutdownManager = new GracefulShutdown({
@@ -358,6 +335,7 @@ export class ServiceBootstrap {
       logger,
       getCurrentTime: resolvedConfig.getCurrentTime,
       config: resolvedConfig,
+      checkReadiness: () => this.checkReadiness(),
     };
 
     return this.context;
@@ -408,6 +386,41 @@ export class ServiceBootstrap {
     );
 
     return ctx;
+  }
+
+  /**
+   * Run the readiness checks: the stores and the message bus must answer, plus the configured
+   * dependencies. A hung dependency fails the check instead of hanging the probe.
+   */
+  async checkReadiness(): Promise<DependencyCheckSummary> {
+    const ctx = await this.initialize();
+    const resolvedConfig = this.resolveConfig();
+
+    const checks: DependencyCheck[] = [];
+
+    if (resolvedConfig.includeDefaultDependencyChecks) {
+      checks.push(...this.buildStoreDependencyChecks(ctx));
+
+      if (resolvedConfig.autoStartMessageBus) {
+        checks.push({
+          name: 'PubSub',
+          check: async () => {
+            if (!ctx.messageBus.isStarted?.()) {
+              throw new Error('Message bus is not started');
+            }
+          },
+        });
+      }
+    }
+
+    checks.push(...resolvedConfig.dependencies);
+
+    return this.getDependencyChecker().checkAll(
+      checks.map((check) => ({
+        ...check,
+        timeoutMs: check.timeoutMs ?? READINESS_CHECK_TIMEOUT_MS,
+      })),
+    );
   }
 
   /**
@@ -536,7 +549,12 @@ export class ServiceBootstrap {
       pubsub: {
         projectId: resolvedPubsubProjectId,
         emulatorHost: pubsubEmulatorHost,
-        topicPrefix: this.config.pubsub?.topicPrefix ?? resolvedServiceName,
+        topicPrefix:
+          this.config.pubsub?.topicPrefix ??
+          process.env.PUBSUB_TOPIC_PREFIX ??
+          resolvedServiceName,
+        subscriptionId:
+          this.config.pubsub?.subscriptionId ?? resolvedServiceName,
         subscriptionOptions: this.config.pubsub?.subscriptionOptions,
         autoCreateResources: this.config.pubsub?.autoCreateResources ?? true,
         cleanupOnClose: this.config.pubsub?.cleanupOnClose ?? false,
@@ -548,6 +566,8 @@ export class ServiceBootstrap {
       dependencies: this.config.dependencies ?? [],
       includeDefaultDependencyChecks:
         this.config.includeDefaultDependencyChecks ?? true,
+      includeRealtimeDatabaseCheck:
+        this.config.includeRealtimeDatabaseCheck ?? true,
       autoStartMessageBus: this.config.autoStartMessageBus ?? true,
       shutdownOnDependencyFailure:
         this.config.shutdownOnDependencyFailure ?? true,
@@ -631,19 +651,31 @@ export class ServiceBootstrap {
       });
     }
 
-    checks.push({
-      name: 'Firestore',
-      check: async () => {
-        await ctx.firestore.doc('_healthcheck/connection').get();
-      },
-    });
+    checks.push(...this.buildStoreDependencyChecks(ctx));
 
-    checks.push({
-      name: 'Realtime Database',
-      check: async () => {
-        await ctx.database.ref('_healthcheck/connection').once('value');
+    return checks;
+  }
+
+  private buildStoreDependencyChecks(
+    ctx: ServiceBootstrapContext,
+  ): DependencyCheck[] {
+    const checks: DependencyCheck[] = [
+      {
+        name: 'Firestore',
+        check: async () => {
+          await ctx.firestore.collection('_healthcheck').limit(1).get();
+        },
       },
-    });
+    ];
+
+    if (this.resolveConfig().includeRealtimeDatabaseCheck) {
+      checks.push({
+        name: 'Realtime Database',
+        check: async () => {
+          await ctx.database.ref('_healthcheck/connection').once('value');
+        },
+      });
+    }
 
     return checks;
   }

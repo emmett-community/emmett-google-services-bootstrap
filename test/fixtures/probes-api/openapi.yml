@@ -1,0 +1,51 @@
+openapi: 3.0.3
+info:
+  title: Probes
+  version: 1.0.0
+paths:
+  /health:
+    get:
+      operationId: getHealth
+      x-eov-operation-handler: health
+      responses:
+        '200':
+          description: The process is up
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Status'
+  /ready:
+    get:
+      operationId: getReady
+      x-eov-operation-handler: health
+      responses:
+        '200':
+          description: The service is ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Status'
+        '503':
+          description: A dependency is not ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Status'
+components:
+  schemas:
+    Status:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+        checks:
+          type: array
+          items:
+            type: object
+            required: [name, ok]
+            properties:
+              name:
+                type: string
+              ok:
+                type: boolean

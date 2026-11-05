@@ -5,7 +5,8 @@ const env = process.env.NODE_ENV;
 export default defineConfig([
   {
     format: ['esm', 'cjs'],
-    splitting: false,
+    // The testing entry shares the bootstrap code with the main entry instead of bundling a copy
+    splitting: true,
     clean: true,
     dts: true,
     // TODO: For some reason minified code doesn't work for cjs
@@ -15,7 +16,7 @@ export default defineConfig([
     watch: env === 'development',
     target: 'esnext',
     outDir: 'dist', //env === 'production' ? 'dist' : 'lib',
-    entry: ['src/index.ts'],
+    entry: { index: 'src/index.ts', testing: 'src/testing/index.ts' },
     sourcemap: true,
     tsconfig: 'tsconfig.build.json',
     shims: true,

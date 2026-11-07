@@ -285,6 +285,7 @@ export class ServiceBootstrap {
         database,
         projections: resolvedConfig.projections,
         collections: resolvedConfig.eventStore.collections,
+        hooks: resolvedConfig.eventStore.hooks,
         logger,
       });
 
@@ -578,6 +579,7 @@ export class ServiceBootstrap {
       },
       eventStore: {
         collections: this.config.eventStore?.collections,
+        hooks: this.config.eventStore?.hooks,
       },
       _testOverrides: this.config._testOverrides,
     };

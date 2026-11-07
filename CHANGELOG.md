@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.5.0] - 2026-11-07
+
+### Added
+
+- `eventStore.hooks` option, passed as is to the Firestore event store. `hooks.beforeCommit` runs inside the transaction of every append, so a service can add writes that commit atomically with its events.
+
+### Changed
+
+- Depends on `@emmett-community/emmett-google-firestore` ^0.7.0. `ctx.eventStore.appendToStream` now returns `messageIds`, the `messageId` stored on each event.
+
 ## [0.4.0] - 2026-11-04
 
 ### Added

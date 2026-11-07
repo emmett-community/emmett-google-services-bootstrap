@@ -106,6 +106,7 @@ export type ServiceBootstrapConfig = {
   pubsub?: PubSubConfig;
   eventStore?: {
     collections?: FirestoreEventStoreOptions['collections'];
+    hooks?: FirestoreEventStoreOptions['hooks'];
   };
   observability?: ObservabilityConfig;
   projections?: RealtimeDBInlineProjectionDefinition[];
@@ -144,6 +145,7 @@ export type ResolvedServiceBootstrapConfig = {
   pubsub: ResolvedPubSubConfig;
   eventStore: {
     collections?: FirestoreEventStoreOptions['collections'];
+    hooks?: FirestoreEventStoreOptions['hooks'];
   };
   observability: ObservabilityConfig;
   projections: RealtimeDBInlineProjectionDefinition[];

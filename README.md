@@ -140,6 +140,10 @@ Event and command subscriptions are named after the service, so they survive res
 - `eventStore.collections.streams`: Firestore collection that stores stream metadata (defaults to `"streams"`).
 - `eventStore.collections.counters`: Firestore collection for shared counters (defaults to `"_counters"`).
 
+### Event store hooks
+
+`eventStore.hooks` is passed as is to the Firestore event store. `hooks.beforeCommit(transaction, events)` runs inside the transaction of every append, so what it writes on the transaction commits atomically with the events. See the readme of `@emmett-community/emmett-google-firestore` for the rules of the hook. `ctx.eventStore.appendToStream` returns `messageIds`, the `messageId` stored on each event.
+
 ## API
 
 ### ServiceBootstrap

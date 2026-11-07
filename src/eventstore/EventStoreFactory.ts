@@ -18,6 +18,7 @@ export type EventStoreFactoryOptions = {
   projections?: RealtimeDBInlineProjectionDefinition[];
   logger?: Logger;
   collections?: FirestoreEventStoreOptions['collections'];
+  hooks?: FirestoreEventStoreOptions['hooks'];
 };
 
 /**
@@ -26,13 +27,14 @@ export type EventStoreFactoryOptions = {
 export const createEventStore = <T extends EventStore = EventStore>(
   options: EventStoreFactoryOptions,
 ): T => {
-  const { firestore, database, projections, logger, collections } = options;
+  const { firestore, database, projections, logger, collections, hooks } = options;
   const observability = logger ? { logger } : undefined;
 
   const baseEventStore = asEventStore(
     getFirestoreEventStore(firestore, {
       observability,
       collections,
+      hooks,
     }),
   ) as unknown as T;
 

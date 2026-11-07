@@ -66,6 +66,37 @@ void describe('EventStoreFactory - unit', () => {
     assert.equal(counters.size, 1);
   });
 
+  void it('passes the hooks to the Firestore event store', async () => {
+    const firestore = createInMemoryFirestore();
+    const received: string[] = [];
+
+    const eventStore = createEventStore({
+      firestore,
+      database: createInMemoryDatabase(),
+      hooks: {
+        beforeCommit: (transaction, events) => {
+          for (const event of events) {
+            received.push(event.type);
+            transaction.set(firestore.collection('audit').doc(event.messageId), {
+              type: event.type,
+            });
+          }
+        },
+      },
+    });
+
+    const result = (await eventStore.appendToStream('stream-1', [
+      { type: 'TestEvent', data: { value: 1 } },
+    ])) as unknown as { messageIds: string[] };
+
+    const audit = await firestore.collection('audit').get();
+    assert.deepEqual(received, ['TestEvent']);
+    assert.deepEqual(
+      audit.docs.map((doc) => doc.ref.id),
+      result.messageIds,
+    );
+  });
+
   void it('exposes the canonical event store contract', async () => {
     const eventStore = createEventStore({
       firestore: createInMemoryFirestore(),

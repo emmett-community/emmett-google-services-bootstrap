@@ -66,7 +66,11 @@ export class PubSubInitializer {
   /**
    * Initialize PubSub client or return injected instance.
    */
-  async initialize(): Promise<PubSub> {
+  initialize(): Promise<PubSub> {
+    return new Promise((resolve) => resolve(this.initializeNow()));
+  }
+
+  private initializeNow(): PubSub {
     const { projectId, emulatorHost, logger } = this.options;
 
     if (emulatorHost && !process.env.PUBSUB_EMULATOR_HOST) {

@@ -44,7 +44,10 @@ const normalizeErrorContext = (error: unknown): Record<string, unknown> => {
   return { err: error };
 };
 
-const withTimeout = async <T>(promise: Promise<T>, timeoutMs?: number): Promise<T> => {
+const withTimeout = async <T>(
+  promise: Promise<T>,
+  timeoutMs?: number,
+): Promise<T> => {
   if (!timeoutMs || timeoutMs <= 0) return promise;
 
   let timeoutId: NodeJS.Timeout | undefined;
@@ -80,7 +83,7 @@ export class GracefulShutdown {
     this.logger = options?.logger;
     this.timeoutMs = options?.timeoutMs;
     this.exitOnComplete = options?.exitOnComplete ?? false;
-    this.exitFn = options?.exitFn ?? process.exit;
+    this.exitFn = options?.exitFn ?? ((code: number) => process.exit(code));
   }
 
   /**
@@ -100,7 +103,10 @@ export class GracefulShutdown {
   /**
    * Execute all shutdown tasks and return the aggregated result.
    */
-  async shutdown(reason: string, exitCode = 1): Promise<GracefulShutdownResult> {
+  async shutdown(
+    reason: string,
+    exitCode = 1,
+  ): Promise<GracefulShutdownResult> {
     if (this.shuttingDown && this.lastResult) {
       return this.lastResult;
     }

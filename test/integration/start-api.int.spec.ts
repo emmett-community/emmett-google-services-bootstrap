@@ -24,7 +24,11 @@ const startService = async (options: { started?: boolean } = {}) => {
     port: 0,
     registerSignalHandlers: false,
     initializeHandlers: (handlers, ctx) =>
-      (handlers as any).health.initializeHandlers(ctx),
+      (
+        handlers as {
+          health: { initializeHandlers: (context: typeof ctx) => void };
+        }
+      ).health.initializeHandlers(ctx),
   });
 
   if (options.started === false) {

@@ -27,7 +27,8 @@ export type EventStoreFactoryOptions = {
 export const createEventStore = <T extends EventStore = EventStore>(
   options: EventStoreFactoryOptions,
 ): T => {
-  const { firestore, database, projections, logger, collections, hooks } = options;
+  const { firestore, database, projections, logger, collections, hooks } =
+    options;
   const observability = logger ? { logger } : undefined;
 
   const baseEventStore = asEventStore(
@@ -39,12 +40,12 @@ export const createEventStore = <T extends EventStore = EventStore>(
   ) as unknown as T;
 
   if (projections && projections.length > 0) {
-    return wireRealtimeDBProjections({
+    return wireRealtimeDBProjections<T>({
       eventStore: baseEventStore,
       database,
       projections,
       observability,
-    }) as T;
+    });
   }
 
   return baseEventStore;

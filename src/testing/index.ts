@@ -68,7 +68,8 @@ export const createTestServiceBootstrap = (
     observability: { createLogger: false, ...config.observability },
     _testOverrides: {
       ...overrides,
-      firebaseAdmin: firebaseAdmin as ServiceBootstrapOverrides['firebaseAdmin'],
+      firebaseAdmin:
+        firebaseAdmin as ServiceBootstrapOverrides['firebaseAdmin'],
       firestore,
       database,
       auth,

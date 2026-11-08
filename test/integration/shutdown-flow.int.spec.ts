@@ -1,3 +1,5 @@
+import type { FirebaseAdminLike } from '../../src/types/config';
+import type { Auth } from 'firebase-admin/auth';
 import assert from 'node:assert/strict';
 import { describe, it, mock } from 'node:test';
 import { ServiceBootstrap } from '../../src/bootstrap/ServiceBootstrap';
@@ -11,10 +13,11 @@ void describe('Shutdown Integration Flow', () => {
   void it('runs registered shutdown tasks', async () => {
     const firestore = createInMemoryFirestore();
     const terminate = mock.fn(async () => {});
-    (firestore as any).terminate = terminate;
+    (firestore as unknown as { terminate: typeof terminate }).terminate =
+      terminate;
 
     const database = createInMemoryDatabase();
-    const auth = {} as any;
+    const auth = {} as Auth;
     const pubsub = createInMemoryPubSub();
     const eventStore = getInMemoryEventStore();
 
@@ -28,13 +31,14 @@ void describe('Shutdown Integration Flow', () => {
 
     const firebaseAdmin = {
       apps: [],
-      initializeApp: mock.fn(() => app),
+      initializeApp: mock.fn((_options?: unknown) => app),
       app: mock.fn(() => app),
     };
 
+    const close = mock.fn(async () => {});
     const messageBus: MessageBusWithLifecycle = {
       start: mock.fn(async () => {}),
-      close: mock.fn(async () => {}),
+      close,
     } as unknown as MessageBusWithLifecycle;
 
     const bootstrap = new ServiceBootstrap({
@@ -43,7 +47,7 @@ void describe('Shutdown Integration Flow', () => {
       pubsub: { projectId: 'test-project' },
       includeDefaultDependencyChecks: false,
       _testOverrides: {
-        firebaseAdmin,
+        firebaseAdmin: firebaseAdmin as unknown as FirebaseAdminLike,
         firestore,
         database,
         auth,
@@ -57,7 +61,7 @@ void describe('Shutdown Integration Flow', () => {
     const result = await bootstrap.shutdown('test', 0);
 
     assert.equal(result.exitCode, 0);
-    assert.equal(messageBus.close.mock.callCount(), 1);
+    assert.equal(close.mock.callCount(), 1);
     assert.equal(terminate.mock.callCount(), 1);
     assert.equal(deleteApp.mock.callCount(), 1);
   });

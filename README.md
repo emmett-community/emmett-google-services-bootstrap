@@ -50,7 +50,7 @@ import { userDetailsProjection } from './projections/userDetailsProjection';
 import { setupUserDataRemovalSubscriber } from './subscriptions/userDataRemovalSubscriber';
 
 const bootstrap = new ServiceBootstrap({
-  serviceName: 'user-service',
+  serviceName: 'orders-service',
   projections: [userDetailsProjection],
 });
 
@@ -97,21 +97,21 @@ await bootstrap.startApi({
 import type { ServiceBootstrapConfig } from '@emmett-community/emmett-google-services-bootstrap';
 
 const config: ServiceBootstrapConfig = {
-  serviceName: 'user-service',
+  serviceName: 'orders-service',
   firebase: {
     projectId: 'demo-project',
     databaseURL: 'https://demo-project-default-rtdb.firebaseio.com',
   },
   pubsub: {
     projectId: 'demo-project',
-    topicPrefix: 'user-service',
-    subscriptionId: 'user-service',
+    topicPrefix: 'orders-service',
+    subscriptionId: 'orders-service',
     autoCreateResources: true,
   },
   eventStore: {
     collections: {
-      streams: 'user-service-streams',
-      counters: '_user-service-counters',
+      streams: 'orders-service-streams',
+      counters: '_orders-service-counters',
     },
   },
   projections: [],
@@ -208,7 +208,7 @@ export const getReady = (req: Request, res: Response, next: NextFunction) =>
 import { createTestServiceBootstrap } from '@emmett-community/emmett-google-services-bootstrap/testing';
 
 const { bootstrap, firestore, database, messageBus } = createTestServiceBootstrap({
-  serviceName: 'user-service',
+  serviceName: 'orders-service',
   projections: [userDetailsProjection],
 });
 

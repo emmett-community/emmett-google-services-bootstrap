@@ -77,9 +77,12 @@ void describe('EventStoreFactory - unit', () => {
         beforeCommit: (transaction, events) => {
           for (const event of events) {
             received.push(event.type);
-            transaction.set(firestore.collection('audit').doc(event.messageId), {
-              type: event.type,
-            });
+            transaction.set(
+              firestore.collection('audit').doc(event.messageId),
+              {
+                type: event.type,
+              },
+            );
           }
         },
       },

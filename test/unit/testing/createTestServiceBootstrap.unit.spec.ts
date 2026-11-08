@@ -1,5 +1,8 @@
+import type { Event } from '@event-driven-io/emmett';
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import type { AppendToStreamOptions } from '@emmett-community/emmett-google-firestore';
+import type { RealtimeDBInlineProjectionDefinition } from '@emmett-community/emmett-google-realtime-db';
 import { createTestServiceBootstrap } from '../../../src/testing';
 import { createInMemoryDatabase } from '../../helpers/inMemoryDatabase';
 
@@ -49,20 +52,87 @@ void describe('createTestServiceBootstrap - unit', () => {
     await bootstrap.shutdown('test', 0);
   });
 
+  void it('runs the beforeCommit of one append in its transaction, through the wrappers', async () => {
+    const { bootstrap, firestore } = createTestServiceBootstrap({
+      serviceName: 'orders',
+    });
+    const ctx = await bootstrap.initialize();
+    const claim = (key: string): AppendToStreamOptions => ({
+      beforeCommit: (transaction) => {
+        transaction.create(firestore.collection('claims').doc(key) as never, {
+          key,
+        });
+      },
+    });
+    const created = { type: 'OrderCreated', data: { id: 'order' } };
+
+    await ctx.eventStore.appendToStream(
+      'order-1',
+      [created],
+      claim('message-1'),
+    );
+    await assert.rejects(
+      ctx.eventStore.appendToStream('order-2', [created], claim('message-1')),
+    );
+
+    assert.equal((await firestore.collection('claims').get()).size, 1);
+    assert.equal(
+      (await ctx.eventStore.readStream('order-2')).streamExists,
+      false,
+    );
+
+    await bootstrap.shutdown('test', 0);
+  });
+
+  void it('gives the projections the stored messageId and the metadata given on append', async () => {
+    const received: Array<Record<string, unknown>> = [];
+    const projection: RealtimeDBInlineProjectionDefinition = {
+      name: 'trace',
+      canHandle: ['OrderCreated'],
+      handle: (events) => {
+        received.push(
+          ...events.map((event) => event.metadata as Record<string, unknown>),
+        );
+        return Promise.resolve();
+      },
+    };
+    const { bootstrap } = createTestServiceBootstrap({
+      serviceName: 'orders',
+      projections: [projection],
+    });
+    const ctx = await bootstrap.initialize();
+
+    await ctx.eventStore.appendToStream('order-1', [
+      {
+        type: 'OrderCreated',
+        data: { id: 'order-1' },
+        metadata: { causationId: 'message-that-caused-it' },
+      },
+    ]);
+
+    const [stored] = (await ctx.eventStore.readStream('order-1')).events;
+    assert.equal(received.length, 1);
+    assert.equal(received[0].messageId, stored.metadata.messageId);
+    assert.equal(received[0].causationId, 'message-that-caused-it');
+
+    await bootstrap.shutdown('test', 0);
+  });
+
   void it('delivers published events to subscribers', async () => {
     const { bootstrap } = createTestServiceBootstrap({ serviceName: 'orders' });
     const ctx = await bootstrap.initialize();
     const received: string[] = [];
 
-    ctx.messageBus.subscribe(
-      async (event) => {
-        received.push(event.type);
-      },
-      ['OrderCreated'],
-    );
+    ctx.messageBus.subscribe((event: Event) => {
+      received.push(event.type);
+      return Promise.resolve();
+    }, 'OrderCreated');
     await bootstrap.start();
 
-    await ctx.messageBus.publish({ type: 'OrderCreated', data: { id: 'order-1' } });
+    await ctx.messageBus.publish({
+      type: 'OrderCreated',
+      data: { id: 'order-1' },
+    });
     await waitFor(() => received.length === 1);
 
     assert.deepEqual(received, ['OrderCreated']);
@@ -81,7 +151,7 @@ void describe('createTestServiceBootstrap - unit', () => {
     assert.equal((await bootstrap.initialize()).database, database);
   });
 
-  void it('keeps the service configuration given by the caller', async () => {
+  void it('keeps the service configuration given by the caller', () => {
     const { bootstrap } = createTestServiceBootstrap({
       serviceName: 'orders',
       includeRealtimeDatabaseCheck: false,

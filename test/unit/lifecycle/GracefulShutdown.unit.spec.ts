@@ -16,15 +16,17 @@ void describe('GracefulShutdown - unit', () => {
 
     shutdown.register({
       name: 'first',
-      close: async () => {
+      close: () => {
         calls.push('first');
+        return Promise.resolve();
       },
     });
 
     shutdown.register({
       name: 'second',
-      close: async () => {
+      close: () => {
         calls.push('second');
+        return Promise.resolve();
       },
     });
 
@@ -41,22 +43,25 @@ void describe('GracefulShutdown - unit', () => {
 
     shutdown.register({
       name: 'messageBus',
-      close: async () => {
+      close: () => {
         calls.push('messageBus');
+        return Promise.resolve();
       },
     });
 
     shutdown.register({
       name: 'firestore',
-      close: async () => {
+      close: () => {
         calls.push('firestore');
+        return Promise.resolve();
       },
     });
 
     shutdown.registerFirst({
       name: 'httpServer',
-      close: async () => {
+      close: () => {
         calls.push('httpServer');
+        return Promise.resolve();
       },
     });
 
@@ -77,9 +82,7 @@ void describe('GracefulShutdown - unit', () => {
 
     shutdown.register({
       name: 'fail',
-      close: async () => {
-        throw new Error('boom');
-      },
+      close: () => Promise.reject(new Error('boom')),
     });
 
     const result = await shutdown.shutdown('test', 2);

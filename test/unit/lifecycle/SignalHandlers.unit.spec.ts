@@ -13,13 +13,13 @@ void describe('SignalHandlers - unit', () => {
       return process;
     });
 
-    const offMock = mock.fn((signal: NodeJS.Signals, handler: () => void) => {
+    const offMock = mock.fn((signal: NodeJS.Signals, _handler: () => void) => {
       handlers.delete(signal);
       return process;
     });
 
     process.on = onMock as unknown as typeof process.on;
-    process.off = offMock as unknown as typeof process.off;
+    process.off = offMock;
 
     try {
       const shutdown = mock.fn();

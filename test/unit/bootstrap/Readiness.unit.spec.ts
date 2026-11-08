@@ -1,3 +1,7 @@
+import type { Request, RequestHandler, Response } from 'express';
+import type { Database } from 'firebase-admin/database';
+import type { FirebaseAdminLike } from '../../../src/types/config';
+import type { Auth } from 'firebase-admin/auth';
 import assert from 'node:assert/strict';
 import { describe, it, mock } from 'node:test';
 import { getHealth, getReady } from '../../../src/bootstrap/probes';
@@ -12,11 +16,11 @@ import { createInMemoryPubSub } from '../../helpers/inMemoryPubSub';
 
 const createBootstrap = (
   config: Partial<ServiceBootstrapConfig> = {},
-  options: { started?: boolean; database?: any } = {},
+  options: { started?: boolean; database?: Database } = {},
 ) => {
   const firestore = createInMemoryFirestore();
   const database = options.database ?? createInMemoryDatabase();
-  const auth = {} as any;
+  const auth = {} as Auth;
   const app = {
     firestore: () => firestore,
     database: () => database,
@@ -41,7 +45,7 @@ const createBootstrap = (
         apps: [],
         initializeApp: () => app,
         app: () => app,
-      } as any,
+      } as unknown as FirebaseAdminLike,
       firestore,
       database,
       auth,
@@ -54,7 +58,9 @@ const createBootstrap = (
 const names = (summary: { results: Array<{ name: string }> }) =>
   summary.results.map((result) => result.name);
 
-const callHandler = async (handler: any) => {
+const callHandler = async (
+  handler: (...args: Parameters<RequestHandler>) => unknown,
+) => {
   const response: { status?: number; body?: unknown } = {};
   const res = {
     statusCode: 200,
@@ -72,7 +78,9 @@ const callHandler = async (handler: any) => {
     },
   };
 
-  await handler({}, res, () => {});
+  await Promise.resolve(
+    handler({} as Request, res as unknown as Response, () => {}),
+  );
 
   return response;
 };
@@ -82,15 +90,24 @@ void describe('ServiceBootstrap readiness - unit', () => {
     const summary = await createBootstrap().checkReadiness();
 
     assert.equal(summary.ok, true);
-    assert.deepEqual(names(summary), ['Firestore', 'Realtime Database', 'PubSub']);
+    assert.deepEqual(names(summary), [
+      'Firestore',
+      'Realtime Database',
+      'PubSub',
+    ]);
   });
 
   void it('fails when the message bus is not started', async () => {
-    const summary = await createBootstrap({}, { started: false }).checkReadiness();
+    const summary = await createBootstrap(
+      {},
+      { started: false },
+    ).checkReadiness();
 
     assert.equal(summary.ok, false);
     assert.deepEqual(
-      summary.results.filter((result) => !result.ok).map((result) => result.name),
+      summary.results
+        .filter((result) => !result.ok)
+        .map((result) => result.name),
       ['PubSub'],
     );
   });
@@ -107,7 +124,10 @@ void describe('ServiceBootstrap readiness - unit', () => {
   });
 
   void it('checks the Realtime Database by default', () => {
-    assert.equal(createBootstrap().getConfig().includeRealtimeDatabaseCheck, true);
+    assert.equal(
+      createBootstrap().getConfig().includeRealtimeDatabaseCheck,
+      true,
+    );
   });
 
   void it('includes the configured dependencies and fails with them', async () => {
@@ -115,9 +135,7 @@ void describe('ServiceBootstrap readiness - unit', () => {
       dependencies: [
         {
           name: 'billing',
-          check: async () => {
-            throw new Error('billing down');
-          },
+          check: () => Promise.reject(new Error('billing down')),
         },
       ],
     }).checkReadiness();

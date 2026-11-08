@@ -28,6 +28,25 @@ Feature: Event Store Integration
     And the new view should reflect the complete history
     And no events should be skipped
 
+  Scenario: Recording something together with every event
+    Given the service records something of its own whenever events are recorded
+    When a business event is recorded
+    Then the event and that record are stored together
+    And if storing that record fails, the event is not stored either
+
+  Scenario: Recording something together with one event only
+    Given a business action wants to record something of its own with its event
+    When the event of that action is recorded
+    Then the event and that record are stored together
+    And other events are recorded without it
+    And if that record already exists, the event of that action is not stored
+
+  Scenario: Views see the events as they were stored
+    Given business events are recorded with metadata of their own
+    When the views are updated from these events
+    Then each view sees the same event id as the stored event
+    And each view sees the metadata given when the event was recorded
+
   Scenario: Concurrent event recording
     Given multiple business actions happen simultaneously
     When all events are recorded

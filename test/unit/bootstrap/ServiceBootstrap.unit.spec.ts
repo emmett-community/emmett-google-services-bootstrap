@@ -1,6 +1,11 @@
+import type { FirebaseAdminLike } from '../../../src/types/config';
+import type { Auth } from 'firebase-admin/auth';
 import assert from 'node:assert/strict';
 import { describe, it, afterEach, mock } from 'node:test';
-import { ServiceBootstrap, DependencyUnavailableError } from '../../../src/bootstrap/ServiceBootstrap';
+import {
+  ServiceBootstrap,
+  DependencyUnavailableError,
+} from '../../../src/bootstrap/ServiceBootstrap';
 import { createInMemoryFirestore } from '../../helpers/inMemoryFirestore';
 import { createInMemoryDatabase } from '../../helpers/inMemoryDatabase';
 import { createInMemoryPubSub } from '../../helpers/inMemoryPubSub';
@@ -18,7 +23,7 @@ void describe('ServiceBootstrap - unit', () => {
   void it('initializes with overrides', async () => {
     const firestore = createInMemoryFirestore();
     const database = createInMemoryDatabase();
-    const auth = {} as any;
+    const auth = {} as Auth;
     const pubsub = createInMemoryPubSub();
     const eventStore = getInMemoryEventStore();
     const app = {
@@ -30,7 +35,7 @@ void describe('ServiceBootstrap - unit', () => {
 
     const firebaseAdmin = {
       apps: [],
-      initializeApp: mock.fn(() => app),
+      initializeApp: mock.fn((_options?: unknown) => app),
       app: mock.fn(() => app),
     };
 
@@ -45,7 +50,7 @@ void describe('ServiceBootstrap - unit', () => {
       pubsub: { projectId: 'test-project' },
       includeDefaultDependencyChecks: false,
       _testOverrides: {
-        firebaseAdmin,
+        firebaseAdmin: firebaseAdmin as unknown as FirebaseAdminLike,
         firestore,
         database,
         auth,
@@ -72,15 +77,18 @@ void describe('ServiceBootstrap - unit', () => {
 
     const bootstrap = new ServiceBootstrap({
       serviceName: '',
-    } as any);
+    });
 
-    assert.throws(() => bootstrap.getConfig(), /Missing required configuration/);
+    assert.throws(
+      () => bootstrap.getConfig(),
+      /Missing required configuration/,
+    );
   });
 
   void it('fails startup when dependency check fails', async () => {
     const firestore = createInMemoryFirestore();
     const database = createInMemoryDatabase();
-    const auth = {} as any;
+    const auth = {} as Auth;
     const pubsub = createInMemoryPubSub();
     const eventStore = getInMemoryEventStore();
     const app = {
@@ -92,7 +100,7 @@ void describe('ServiceBootstrap - unit', () => {
 
     const firebaseAdmin = {
       apps: [],
-      initializeApp: mock.fn(() => app),
+      initializeApp: mock.fn((_options?: unknown) => app),
       app: mock.fn(() => app),
     };
 
@@ -110,13 +118,11 @@ void describe('ServiceBootstrap - unit', () => {
       dependencies: [
         {
           name: 'failing',
-          check: async () => {
-            throw new Error('dependency down');
-          },
+          check: () => Promise.reject(new Error('dependency down')),
         },
       ],
       _testOverrides: {
-        firebaseAdmin,
+        firebaseAdmin: firebaseAdmin as unknown as FirebaseAdminLike,
         firestore,
         database,
         auth,

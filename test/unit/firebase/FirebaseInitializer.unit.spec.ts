@@ -1,3 +1,4 @@
+import type { FirebaseAdminLike } from '../../../src/types/config';
 import assert from 'node:assert/strict';
 import { describe, it, afterEach, mock } from 'node:test';
 import { FirebaseInitializer } from '../../../src/firebase/FirebaseInitializer';
@@ -23,7 +24,7 @@ void describe('FirebaseInitializer - unit', () => {
 
     const firebaseAdmin = {
       apps: [],
-      initializeApp: mock.fn(() => app),
+      initializeApp: mock.fn((_options?: unknown) => app),
       app: mock.fn(() => app),
     };
 
@@ -31,7 +32,7 @@ void describe('FirebaseInitializer - unit', () => {
       projectId: 'test-project',
       databaseEmulatorHost: 'localhost:9000',
       firestoreEmulatorHost: 'localhost:8080',
-      _firebaseAdmin: firebaseAdmin,
+      _firebaseAdmin: firebaseAdmin as unknown as FirebaseAdminLike,
     });
 
     const result = await initializer.initialize();
@@ -60,13 +61,13 @@ void describe('FirebaseInitializer - unit', () => {
 
     const firebaseAdmin = {
       apps: [app],
-      initializeApp: mock.fn(() => app),
+      initializeApp: mock.fn((_options?: unknown) => app),
       app: mock.fn(() => app),
     };
 
     const initializer = new FirebaseInitializer({
       projectId: 'test-project',
-      _firebaseAdmin: firebaseAdmin,
+      _firebaseAdmin: firebaseAdmin as unknown as FirebaseAdminLike,
     });
 
     await initializer.initialize();

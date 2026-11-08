@@ -84,7 +84,9 @@ export class DependencyUnavailableError extends Error {
 export type CreateAppOptions = {
   openApiPath: string;
   handlersPath: string;
-  initializeHandlers: (handlers?: ImportedHandlerModules) => void | Promise<void>;
+  initializeHandlers: (
+    handlers?: ImportedHandlerModules,
+  ) => void | Promise<void>;
   openApiOptions?: Partial<
     Omit<
       OpenApiValidatorOptions,
@@ -265,8 +267,10 @@ export class ServiceBootstrap {
 
     const firebase = await firebaseInitializer.initialize();
 
-    const firestore = resolvedConfig._testOverrides?.firestore ?? firebase.firestore;
-    const database = resolvedConfig._testOverrides?.database ?? firebase.database;
+    const firestore =
+      resolvedConfig._testOverrides?.firestore ?? firebase.firestore;
+    const database =
+      resolvedConfig._testOverrides?.database ?? firebase.database;
     const auth = resolvedConfig._testOverrides?.auth ?? firebase.auth;
 
     const pubsubInitializer = new PubSubInitializer({
@@ -405,11 +409,10 @@ export class ServiceBootstrap {
       if (resolvedConfig.autoStartMessageBus) {
         checks.push({
           name: 'PubSub',
-          check: async () => {
-            if (!ctx.messageBus.isStarted?.()) {
-              throw new Error('Message bus is not started');
-            }
-          },
+          check: () =>
+            ctx.messageBus.isStarted?.()
+              ? Promise.resolve()
+              : Promise.reject(new Error('Message bus is not started')),
         });
       }
     }
@@ -427,7 +430,10 @@ export class ServiceBootstrap {
   /**
    * Execute graceful shutdown tasks and return the shutdown result.
    */
-  async shutdown(reason: string, exitCode = 1): Promise<GracefulShutdownResult> {
+  async shutdown(
+    reason: string,
+    exitCode = 1,
+  ): Promise<GracefulShutdownResult> {
     return this.getShutdownManager().shutdown(reason, exitCode);
   }
 
@@ -511,7 +517,7 @@ export class ServiceBootstrap {
       throw new Error(`Missing required configuration: ${missing.join(', ')}`);
     }
 
-    const resolvedServiceName = serviceName as string;
+    const resolvedServiceName = serviceName;
     const resolvedFirebaseProjectId = firebaseProjectId as string;
     const resolvedPubsubProjectId = pubsubProjectId as string;
 
@@ -596,7 +602,9 @@ export class ServiceBootstrap {
 
   private getDependencyChecker(): DependencyChecker {
     if (!this.dependencyChecker) {
-      this.dependencyChecker = new DependencyChecker({ logger: this.getLogger() });
+      this.dependencyChecker = new DependencyChecker({
+        logger: this.getLogger(),
+      });
     }
     return this.dependencyChecker;
   }

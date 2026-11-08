@@ -30,7 +30,10 @@ const normalizeErrorContext = (error: unknown): Record<string, unknown> => {
   return { err: error };
 };
 
-const withTimeout = async <T>(promise: Promise<T>, timeoutMs?: number): Promise<T> => {
+const withTimeout = async <T>(
+  promise: Promise<T>,
+  timeoutMs?: number,
+): Promise<T> => {
   if (!timeoutMs || timeoutMs <= 0) return promise;
 
   let timeoutId: NodeJS.Timeout | undefined;
@@ -67,11 +70,18 @@ export const startDependency = async (
 
   try {
     await withTimeout(startFn(), timeoutMs);
-    logger?.info({ dependency, durationMs: Date.now() - startTime }, successMessage);
+    logger?.info(
+      { dependency, durationMs: Date.now() - startTime },
+      successMessage,
+    );
     return true;
   } catch (error) {
     logger?.warn(
-      { dependency, durationMs: Date.now() - startTime, ...normalizeErrorContext(error) },
+      {
+        dependency,
+        durationMs: Date.now() - startTime,
+        ...normalizeErrorContext(error),
+      },
       'Unable to reach dependency',
     );
     return false;
@@ -135,7 +145,9 @@ export class DependencyChecker {
     }
   }
 
-  async checkAll(dependencies: DependencyCheck[]): Promise<DependencyCheckSummary> {
+  async checkAll(
+    dependencies: DependencyCheck[],
+  ): Promise<DependencyCheckSummary> {
     const results: DependencyCheckResult[] = [];
 
     for (const dependency of dependencies) {

@@ -24,9 +24,7 @@ void describe('DependencyChecker - unit', () => {
 
     const result = await checker.check({
       name: 'failure',
-      check: async () => {
-        throw new Error('boom');
-      },
+      check: () => Promise.reject(new Error('boom')),
     });
 
     assert.equal(result.ok, false);
@@ -57,9 +55,7 @@ void describe('DependencyChecker - unit', () => {
       { name: 'one', check: async () => {} },
       {
         name: 'optional',
-        check: async () => {
-          throw new Error('optional failed');
-        },
+        check: () => Promise.reject(new Error('optional failed')),
         required: false,
       },
     ]);
@@ -69,9 +65,9 @@ void describe('DependencyChecker - unit', () => {
   });
 
   void it('startDependency returns false on failure', async () => {
-    const ok = await startDependency('dependency', async () => {
-      throw new Error('fail');
-    });
+    const ok = await startDependency('dependency', () =>
+      Promise.reject(new Error('fail')),
+    );
 
     assert.equal(ok, false);
   });

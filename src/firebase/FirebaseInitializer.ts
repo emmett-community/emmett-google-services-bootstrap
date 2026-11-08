@@ -73,16 +73,20 @@ export class FirebaseInitializer {
   isEmulatorMode(): boolean {
     return Boolean(
       this.options.firestoreEmulatorHost ||
-        this.options.databaseEmulatorHost ||
-        process.env.FIRESTORE_EMULATOR_HOST ||
-        process.env.FIREBASE_DATABASE_EMULATOR_HOST,
+      this.options.databaseEmulatorHost ||
+      process.env.FIRESTORE_EMULATOR_HOST ||
+      process.env.FIREBASE_DATABASE_EMULATOR_HOST,
     );
   }
 
   /**
    * Initialize Firebase Admin and return service handles.
    */
-  async initialize(): Promise<FirebaseInitResult> {
+  initialize(): Promise<FirebaseInitResult> {
+    return new Promise((resolve) => resolve(this.initializeNow()));
+  }
+
+  private initializeNow(): FirebaseInitResult {
     const {
       projectId,
       databaseURL,
@@ -103,7 +107,11 @@ export class FirebaseInitializer {
       databaseURL ?? this.getDatabaseURL(projectId, databaseEmulatorHost);
 
     const firebaseAdmin = this.options._firebaseAdmin ?? admin;
-    const app = this.getOrCreateApp(firebaseAdmin, projectId, resolvedDatabaseURL);
+    const app = this.getOrCreateApp(
+      firebaseAdmin,
+      projectId,
+      resolvedDatabaseURL,
+    );
 
     safeLog.info(logger, 'Firebase initialized', {
       projectId,
@@ -143,12 +151,10 @@ export class FirebaseInitializer {
     }
 
     safeLog.debug(this.options.logger, 'Creating Firebase app');
-    return firebaseAdmin.initializeApp(
-      {
-        projectId,
-        databaseURL,
-      },
-    );
+    return firebaseAdmin.initializeApp({
+      projectId,
+      databaseURL,
+    });
   }
 
   private getDatabaseURL(projectId: string, emulatorHost?: string): string {

@@ -1,4 +1,7 @@
-import type { SubscriptionOptions, PubSubMessageBusLifecycle } from '@emmett-community/emmett-google-pubsub';
+import type {
+  SubscriptionOptions,
+  PubSubMessageBusLifecycle,
+} from '@emmett-community/emmett-google-pubsub';
 import type { RealtimeDBInlineProjectionDefinition } from '@emmett-community/emmett-google-realtime-db';
 import type { FirestoreEventStoreOptions } from '@emmett-community/emmett-google-firestore';
 import type {
@@ -14,7 +17,8 @@ import type { Auth } from 'firebase-admin/auth';
 import type { app as FirebaseAppNamespace } from 'firebase-admin';
 import type { Database } from 'firebase-admin/database';
 
-export type LogLevel = 'fatal' | 'error' | 'warn' | 'info' | 'debug' | 'trace' | 'silent';
+export type LogLevel =
+  'fatal' | 'error' | 'warn' | 'info' | 'debug' | 'trace' | 'silent';
 
 /**
  * Canonical logger contract used across Emmett packages.

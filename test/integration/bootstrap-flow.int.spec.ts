@@ -1,3 +1,5 @@
+import type { FirebaseAdminLike } from '../../src/types/config';
+import type { Auth } from 'firebase-admin/auth';
 import assert from 'node:assert/strict';
 import { describe, it, mock } from 'node:test';
 import { ServiceBootstrap } from '../../src/bootstrap/ServiceBootstrap';
@@ -11,7 +13,7 @@ void describe('Bootstrap Integration Flow', () => {
   void it('initializes overrides and runs custom dependencies', async () => {
     const firestore = createInMemoryFirestore();
     const database = createInMemoryDatabase();
-    const auth = {} as any;
+    const auth = {} as Auth;
     const pubsub = createInMemoryPubSub();
     const eventStore = getInMemoryEventStore();
     const app = {
@@ -23,7 +25,7 @@ void describe('Bootstrap Integration Flow', () => {
 
     const firebaseAdmin = {
       apps: [],
-      initializeApp: mock.fn(() => app),
+      initializeApp: mock.fn((_options?: unknown) => app),
       app: mock.fn(() => app),
     };
 
@@ -42,13 +44,14 @@ void describe('Bootstrap Integration Flow', () => {
       dependencies: [
         {
           name: 'custom',
-          check: async () => {
+          check: () => {
             dependencyCalled = true;
+            return Promise.resolve();
           },
         },
       ],
       _testOverrides: {
-        firebaseAdmin,
+        firebaseAdmin: firebaseAdmin as unknown as FirebaseAdminLike,
         firestore,
         database,
         auth,

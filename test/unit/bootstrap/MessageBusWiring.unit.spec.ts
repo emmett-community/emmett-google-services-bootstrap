@@ -1,12 +1,11 @@
+import type { FirebaseAdminLike } from '../../../src/types/config';
+import type { Auth } from 'firebase-admin/auth';
 import assert from 'node:assert/strict';
 import { afterEach, describe, it } from 'node:test';
 import { InMemoryPubSub } from '@emmett-community/emmett-google-pubsub/testing';
 import type { PubSub } from '@google-cloud/pubsub';
 import { ServiceBootstrap } from '../../../src/bootstrap/ServiceBootstrap';
-import type {
-  Logger,
-  ServiceBootstrapConfig,
-} from '../../../src/types/config';
+import type { Logger, ServiceBootstrapConfig } from '../../../src/types/config';
 import { restoreEnv } from '../../helpers/env';
 import { createInMemoryDatabase } from '../../helpers/inMemoryDatabase';
 import { createInMemoryFirestore } from '../../helpers/inMemoryFirestore';
@@ -41,7 +40,7 @@ const createBootstrap = (
 ) => {
   const firestore = createInMemoryFirestore();
   const database = createInMemoryDatabase();
-  const auth = {} as any;
+  const auth = {} as Auth;
   const app = {
     firestore: () => firestore,
     database: () => database,
@@ -65,7 +64,7 @@ const createBootstrap = (
         apps: [],
         initializeApp: () => app,
         app: () => app,
-      } as any,
+      } as unknown as FirebaseAdminLike,
       firestore,
       database,
       auth,
@@ -79,7 +78,10 @@ const subscriptionExists = async (
   topic: string,
   subscription: string,
 ): Promise<boolean> => {
-  const [exists] = await pubsub.topic(topic).subscription(subscription).exists();
+  const [exists] = await pubsub
+    .topic(topic)
+    .subscription(subscription)
+    .exists();
   return exists;
 };
 
@@ -94,7 +96,7 @@ void describe('ServiceBootstrap message bus wiring - unit', () => {
     const pubsub = new InMemoryPubSub();
     const ctx = await createBootstrap(pubsub).initialize();
 
-    ctx.messageBus.subscribe(async () => {}, ['OrderCreated']);
+    ctx.messageBus.subscribe(async () => {}, 'OrderCreated');
     await ctx.messageBus.start();
 
     assert.equal(
@@ -134,7 +136,7 @@ void describe('ServiceBootstrap message bus wiring - unit', () => {
       pubsub: { subscriptionId: 'orders-worker' },
     }).initialize();
 
-    ctx.messageBus.subscribe(async () => {}, ['OrderCreated']);
+    ctx.messageBus.subscribe(async () => {}, 'OrderCreated');
     await ctx.messageBus.start();
 
     assert.equal(ctx.config.pubsub.subscriptionId, 'orders-worker');
@@ -155,7 +157,7 @@ void describe('ServiceBootstrap message bus wiring - unit', () => {
     const pubsub = new InMemoryPubSub();
     const ctx = await createBootstrap(pubsub).initialize();
 
-    ctx.messageBus.subscribe(async () => {}, ['OrderCreated']);
+    ctx.messageBus.subscribe(async () => {}, 'OrderCreated');
     await ctx.messageBus.start();
 
     assert.equal(ctx.config.pubsub.topicPrefix, 'stg');
@@ -198,7 +200,9 @@ void describe('ServiceBootstrap message bus wiring - unit', () => {
 
     await ctx.messageBus.start();
 
-    const started = records.find((record) => record.message === 'Starting message bus');
+    const started = records.find(
+      (record) => record.message === 'Starting message bus',
+    );
     assert.ok(started, 'the message bus start is logged');
     assert.equal(started.level, 'info');
     assert.equal(typeof started.context, 'object');
@@ -209,9 +213,8 @@ void describe('ServiceBootstrap message bus wiring - unit', () => {
   void it('logs message bus errors with the Error under the err key', async () => {
     const pubsub = new InMemoryPubSub();
     const failure = new Error('publish failed');
-    pubsub.topic('orders-evt-OrderCreated').publishMessage = async () => {
-      throw failure;
-    };
+    pubsub.topic('orders-evt-OrderCreated').publishMessage = () =>
+      Promise.reject(failure);
 
     const { logger, records } = createCapturingLogger();
     const ctx = await createBootstrap(pubsub, {

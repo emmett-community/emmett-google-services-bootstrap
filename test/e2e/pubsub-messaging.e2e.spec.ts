@@ -1,7 +1,12 @@
+import type { Event } from '@event-driven-io/emmett';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { before, beforeEach, after, describe, it } from 'node:test';
-import { GenericContainer, Wait, type StartedTestContainer } from 'testcontainers';
+import {
+  GenericContainer,
+  Wait,
+  type StartedTestContainer,
+} from 'testcontainers';
 import { ServiceBootstrap } from '../../src/bootstrap/ServiceBootstrap';
 import { restoreEnv } from '../helpers/env';
 
@@ -15,7 +20,9 @@ let pubsubPort = 0;
 let bootstrap: ServiceBootstrap | undefined;
 
 const startEmulator = async () => {
-  const container = await new GenericContainer('myfstartup/firebase-emulator-suite:15')
+  const container = await new GenericContainer(
+    'myfstartup/firebase-emulator-suite:15',
+  )
     .withPlatform('linux/amd64')
     .withExposedPorts(4000, 9099, 8080, 9000, 8085)
     .withBindMounts([
@@ -56,7 +63,9 @@ const resetFirestore = async () => {
   );
 
   if (!res.ok) {
-    throw new Error(`Failed to reset Firestore emulator: ${res.status} ${res.statusText}`);
+    throw new Error(
+      `Failed to reset Firestore emulator: ${res.status} ${res.statusText}`,
+    );
   }
 };
 
@@ -67,7 +76,9 @@ const resetDatabase = async () => {
   );
 
   if (!res.ok) {
-    throw new Error(`Failed to reset database emulator: ${res.status} ${res.statusText}`);
+    throw new Error(
+      `Failed to reset database emulator: ${res.status} ${res.statusText}`,
+    );
   }
 };
 
@@ -101,12 +112,15 @@ void describe('PubSub Messaging E2E', () => {
     const ctx = await bootstrap!.initialize();
     const received: unknown[] = [];
 
-    ctx.messageBus.subscribe((event) => {
+    ctx.messageBus.subscribe((event: Event) => {
       received.push(event);
     }, 'TestEvent');
 
     await ctx.messageBus.start();
-    await ctx.messageBus.publish({ type: 'TestEvent', data: { content: 'hello' } });
+    await ctx.messageBus.publish({
+      type: 'TestEvent',
+      data: { content: 'hello' },
+    });
 
     await new Promise((resolve) => setTimeout(resolve, 1000));
 

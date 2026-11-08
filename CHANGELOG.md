@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.6.0] - 2026-11-07
+
+### Changed
+
+- Depends on `@emmett-community/emmett-google-firestore` ^0.8.0. `ctx.eventStore.appendToStream` accepts the `beforeCommit` option of that version, a hook for one append run in its transaction after `eventStore.hooks.beforeCommit`, and the in-memory Firestore of `createTestServiceBootstrap` supports `create` and `delete` in transactions.
+- Depends on `@emmett-community/emmett-google-realtime-db` ^0.9.0. The inline projections receive the `messageId` stored with each event and the metadata given on append.
+
+- `FirebaseInitializer.initialize`, `PubSubInitializer.initialize`, the default message bus readiness check and `getHealth` return their promise without an `async` function that never awaits. A failure still rejects the promise, as before.
+
+### Added
+
+- Tests that the `beforeCommit` option of one append crosses the wrappers of the bootstrap, and that the projections receive the stored `messageId` and the metadata given on append.
+- Linting and formatting: ESLint 9 in the flat format (`eslint.config.mjs`, with `tsconfig.eslint.json` so the tests are type checked) and Prettier, with `lint`, `lint:fix`, `format` and `format:check` scripts. The tests are typed: no `any`, and `messageBus.subscribe` receives the event type as a string, as its signature declares, instead of an array.
+
 ## [0.5.0] - 2026-11-07
 
 ### Added

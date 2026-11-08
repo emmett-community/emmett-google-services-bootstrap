@@ -1,3 +1,4 @@
+import type { PubSub } from '@google-cloud/pubsub';
 import assert from 'node:assert/strict';
 import { describe, it, afterEach, mock } from 'node:test';
 import { PubSubInitializer } from '../../../src/pubsub/PubSubInitializer';
@@ -11,7 +12,7 @@ void describe('PubSubInitializer - unit', () => {
   });
 
   void it('uses provided PubSub client', async () => {
-    const pubsub = { close: mock.fn() } as any;
+    const pubsub = { close: mock.fn() } as unknown as PubSub;
 
     const initializer = new PubSubInitializer({
       projectId: 'test-project',

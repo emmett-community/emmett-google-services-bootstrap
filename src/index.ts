@@ -4,6 +4,8 @@ export * from './firebase';
 export * from './pubsub';
 export * from './lifecycle';
 export * from './eventstore';
+export * from './messaging';
+export * from './security';
 export { realtimeDBInlineProjection } from '@emmett-community/emmett-google-realtime-db';
 export {
   createFirebaseAuthSecurityHandlers,

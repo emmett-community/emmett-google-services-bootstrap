@@ -4,6 +4,8 @@ import type {
 } from '@emmett-community/emmett-google-pubsub';
 import type { RealtimeDBInlineProjectionDefinition } from '@emmett-community/emmett-google-realtime-db';
 import type { FirestoreEventStoreOptions } from '@emmett-community/emmett-google-firestore';
+import type { InboxOptions } from '@my-f-startup/google-firestore-inbox';
+import type { OutboxOptions } from '@my-f-startup/google-firestore-outbox';
 import type {
   CommandProcessor,
   EventSubscription,
@@ -59,7 +61,42 @@ export type PubSubConfig = {
   autoCreateResources?: boolean;
   cleanupOnClose?: boolean;
   closePubSubClient?: boolean;
+  /**
+   * Time limit, in milliseconds, of each Pub/Sub client call of a publication, retries included.
+   * Defaults to 10000: the publication after the commit of an append runs inside the request, and
+   * what is not published in time stays in the outbox.
+   */
+  publishTimeoutMs?: number;
 };
+
+/**
+ * Transactional outbox of the events the service publishes. The appended events whose type is in
+ * `types` are stored in `collection` in the transaction of the append, published on the message
+ * bus once the append committed, and published later by `ctx.outbox.publishPending()` when that
+ * publication failed.
+ */
+export type OutboxConfig = {
+  /** Types of the events published on the message bus. The other events stay in the service. */
+  types: OutboxOptions['types'];
+  /** Defaults to `<serviceName>-outbox`. */
+  collection?: string;
+} & Partial<
+  Pick<OutboxOptions, 'minAgeMs' | 'publishTimeoutMs' | 'batchSize' | 'now'>
+>;
+
+/**
+ * Inbox shared by the subscribers of the service, so each delivered message is handled once.
+ */
+export type InboxConfig = {
+  /** Defaults to `<serviceName>-inbox`. */
+  collection?: string;
+} & Partial<
+  Pick<InboxOptions, 'leaseMs' | 'renewEveryMs' | 'expiryMs' | 'now'>
+>;
+
+export type ResolvedOutboxConfig = OutboxConfig & { collection: string };
+
+export type ResolvedInboxConfig = InboxConfig & { collection: string };
 
 export type DependencyCheck = {
   name: string;
@@ -112,6 +149,9 @@ export type ServiceBootstrapConfig = {
     collections?: FirestoreEventStoreOptions['collections'];
     hooks?: FirestoreEventStoreOptions['hooks'];
   };
+  /** Without it the service publishes nothing through an outbox and `ctx.outbox` is undefined. */
+  outbox?: OutboxConfig;
+  inbox?: InboxConfig;
   observability?: ObservabilityConfig;
   projections?: RealtimeDBInlineProjectionDefinition[];
   getCurrentTime?: () => Date;
@@ -141,6 +181,7 @@ export type ResolvedPubSubConfig = {
   autoCreateResources: boolean;
   cleanupOnClose: boolean;
   closePubSubClient: boolean;
+  publishTimeoutMs: number;
 };
 
 export type ResolvedServiceBootstrapConfig = {
@@ -151,6 +192,8 @@ export type ResolvedServiceBootstrapConfig = {
     collections?: FirestoreEventStoreOptions['collections'];
     hooks?: FirestoreEventStoreOptions['hooks'];
   };
+  outbox?: ResolvedOutboxConfig;
+  inbox: ResolvedInboxConfig;
   observability: ObservabilityConfig;
   projections: RealtimeDBInlineProjectionDefinition[];
   getCurrentTime: () => Date;

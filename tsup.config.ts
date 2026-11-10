@@ -16,7 +16,12 @@ export default defineConfig([
     watch: env === 'development',
     target: 'esnext',
     outDir: 'dist', //env === 'production' ? 'dist' : 'lib',
-    entry: { index: 'src/index.ts', testing: 'src/testing/index.ts' },
+    entry: {
+      index: 'src/index.ts',
+      testing: 'src/testing/index.ts',
+      // Loaded with `node --import`, before the code it instruments
+      tracing: 'src/tracing/index.ts',
+    },
     sourcemap: true,
     tsconfig: 'tsconfig.build.json',
     shims: true,

@@ -4,6 +4,29 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.7.0] - 2026-11-09
+
+### Added
+
+- `outbox` option: a transactional outbox (`@my-f-startup/google-firestore-outbox`) for the events whose type is in `outbox.types`. They are stored in `outbox.collection` (default `<serviceName>-outbox`) in the transaction of the append, published on the message bus with their stored `messageId` once the append committed, and published by `ctx.outbox.publishPending()` when that publication failed. `eventStore.hooks.beforeCommit` still runs, after the outbox record. Without the option nothing changes and `ctx.outbox` is `undefined`.
+- `ctx.inbox`: an inbox (`@my-f-startup/google-firestore-inbox`) shared by the subscribers of the service, in `inbox.collection` (default `<serviceName>-inbox`), so a message delivered again is handled once. Its errors and types are re-exported.
+- `createTestServiceBootstrap` wires the outbox and the inbox on the in-memory Firestore.
+- `ctx.projectStream(streamName)`: the `projectStream` of `@emmett-community/emmett-google-realtime-db` 0.10.0, wired to the event store and the projections of the service. It brings the read models of one stream up to date from its stored events, for the case of a process that stopped between the commit and the projection.
+- `createInternalAuthHandler` and `internalAuthOptionsFromEnvironment`, re-exported from `@my-f-startup/google-internal-auth`: a security handler for internal routes, such as a job called by Cloud Scheduler, that accepts a bearer ID token issued by Google for the audience of the service and the verified email of an allowed caller (`INTERNAL_AUDIENCE`, `INTERNAL_ALLOWED_CALLERS`). The check is skipped when an emulator host is configured.
+- Unit tests of the outbox and the inbox on the in-memory services, an end to end test on the Firebase emulator suite, and the `reliable-messaging.feature`.
+- `@emmett-community/emmett-google-services-bootstrap/tracing` entry with `startTracing()`, loaded with `node --import` before the service: it starts the tracing of `@emmett-community/emmett-observability` and instruments HTTP and Express (`@opentelemetry/instrumentation-http` and `-express`), registering the OpenTelemetry hook for ES modules so an Express app imported with `import` is instrumented too. It does nothing unless `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` or `OTEL_TRACES_EXPORTER=console` is set. The shutdown of the bootstrap flushes the pending spans as its last task. An integration test runs an Express app in a process of its own and checks the HTTP and route spans.
+- The Pub/Sub client is created with `enableOpenTelemetryTracing`, so its calls are traced when an OpenTelemetry SDK is registered. The Firestore client traces its calls by itself in that case.
+- An end to end test on the Firebase emulator suite runs a request that appends an event published through the outbox and handled by a subscriber that appends another event, with the tracing loaded first in a process of its own. It checks that the request, the append, the publication, the handling and the append of the subscriber are one trace, and that the spans of the Firestore and Pub/Sub clients are under the spans of the Emmett libraries.
+
+### Changed
+
+- Depends on `@emmett-community/emmett-google-pubsub` ^0.8.0. A handler failure is now acknowledged only when the error is an `EmmettError`; any other error is retried, whatever its message says, and reaches the dead letter topic when it keeps failing. Handlers run under the span of the handling of their message, a child of the publication. The bus keeps its topic objects and checks a topic on its first publication only.
+- `pubsub.publishTimeoutMs`, default 10000: the limit of each Pub/Sub client call of a publication, retries included, passed to the message bus. Without it a publication the append stopped waiting for (after `outbox.publishTimeoutMs`) kept retrying in the background for about 80 seconds. Unit tests check the default and a configured value, and an end to end test on the emulator with Pub/Sub unreachable checks that the append commits, returns within the limit and leaves the event in the outbox.
+- Depends on `@emmett-community/emmett-google-firestore` ^0.9.0, whose spans are the parents of the spans of the Firestore client.
+- Depends on `@emmett-community/emmett-google-realtime-db` ^0.10.0, for `projectStream`, and because its projections apply with the next append of a stream the events they missed when a process stopped between the commit and the projection. Tests with the Firestore event store cover an event missed in the middle and the first events of a stream.
+- The message bus is created before the event store, so the outbox can publish on it.
+- `build_and_test` runs `lint` and `format:check`, and runs on every pull request: one that changes only documentation skips the build and the tests but still reports the check, instead of leaving it pending.
+
 ## [0.6.0] - 2026-11-07
 
 ### Changed

@@ -10,6 +10,7 @@ import {
   type OpenApiValidatorOptions,
 } from '@emmett-community/emmett-expressjs-with-openapi';
 import { getPubSubMessageBus } from '@emmett-community/emmett-google-pubsub';
+import { projectStream } from '@emmett-community/emmett-google-realtime-db';
 import type { EventStore } from '@event-driven-io/emmett';
 import type { Firestore } from '@google-cloud/firestore';
 import type { PubSub } from '@google-cloud/pubsub';
@@ -28,6 +29,15 @@ import {
   type GracefulShutdownResult,
 } from '../lifecycle/GracefulShutdown';
 import { registerSignalHandlers } from '../lifecycle/SignalHandlers';
+import { getTracingShutdown } from '../tracing/shutdown';
+import type { Inbox } from '@my-f-startup/google-firestore-inbox';
+import type { Outbox } from '@my-f-startup/google-firestore-outbox';
+import { createServiceInbox } from '../messaging/inbox';
+import {
+  createServiceOutbox,
+  withOutboxRecord,
+  withPublishAfterCommit,
+} from '../messaging/outbox';
 import type {
   DependencyCheck,
   Logger as BootstrapLogger,
@@ -51,8 +61,13 @@ export type ServiceBootstrapContext = {
   database: Database;
   auth: Auth;
   pubsub: PubSub;
+  /** With an outbox configured, it records and publishes the events of the outbox types. */
   eventStore: EventStore;
   messageBus: MessageBusWithLifecycle;
+  /** Defined when `outbox` is configured. `publishPending()` is the recovery job. */
+  outbox?: Outbox;
+  /** Inbox shared by the subscribers of the service. */
+  inbox: Inbox;
   logger?: BootstrapLogger;
   getCurrentTime: () => Date;
   config: ResolvedServiceBootstrapConfig;
@@ -61,6 +76,13 @@ export type ServiceBootstrapContext = {
    * message bus again). Used by the `/ready` handler.
    */
   checkReadiness: () => Promise<DependencyCheckSummary>;
+  /**
+   * Brings the read models of one stream up to date by applying its stored events to the
+   * configured projections. The inline projections are written after the append commits, so a
+   * process that stops in between leaves them behind; this catches them up. The projections skip
+   * the events they already applied, so calling it on an up-to-date stream changes nothing.
+   */
+  projectStream: (streamName: string) => Promise<void>;
 };
 
 /**
@@ -113,6 +135,9 @@ const resolvePath = (inputPath: string): string => {
     ? inputPath
     : path.resolve(process.cwd(), inputPath);
 };
+
+// Well under the 60 s a gateway gives a request; a healthy publication takes milliseconds
+const DEFAULT_PUBLISH_TIMEOUT_MS = 10000;
 
 /**
  * Orchestrates Firebase, PubSub, event store, and lifecycle utilities.
@@ -282,17 +307,6 @@ export class ServiceBootstrap {
 
     const pubsub = await pubsubInitializer.initialize();
 
-    const eventStore =
-      resolvedConfig._testOverrides?.eventStore ??
-      createEventStore({
-        firestore,
-        database,
-        projections: resolvedConfig.projections,
-        collections: resolvedConfig.eventStore.collections,
-        hooks: resolvedConfig.eventStore.hooks,
-        logger,
-      });
-
     const messageBus =
       resolvedConfig._testOverrides?.messageBus ??
       getPubSubMessageBus({
@@ -307,8 +321,31 @@ export class ServiceBootstrap {
         autoCreateResources: resolvedConfig.pubsub.autoCreateResources,
         cleanupOnClose: resolvedConfig.pubsub.cleanupOnClose,
         closePubSubClient: resolvedConfig.pubsub.closePubSubClient,
+        publishTimeoutMs: resolvedConfig.pubsub.publishTimeoutMs,
         observability: { logger },
       });
+
+    const outbox = resolvedConfig.outbox
+      ? createServiceOutbox({
+          firestore,
+          messageBus,
+          config: resolvedConfig.outbox,
+          logger,
+        })
+      : undefined;
+
+    const eventStore = this.buildEventStore({
+      firestore,
+      database,
+      outbox,
+      logger,
+    });
+
+    const inbox = createServiceInbox({
+      firestore,
+      config: resolvedConfig.inbox,
+      logger,
+    });
 
     this.shutdownManager = new GracefulShutdown({
       ...resolvedConfig.shutdown,
@@ -337,10 +374,20 @@ export class ServiceBootstrap {
       pubsub,
       eventStore,
       messageBus,
+      outbox,
+      inbox,
       logger,
       getCurrentTime: resolvedConfig.getCurrentTime,
       config: resolvedConfig,
       checkReadiness: () => this.checkReadiness(),
+      projectStream: (streamName: string) =>
+        projectStream({
+          eventStore,
+          database,
+          projections: resolvedConfig.projections,
+          streamName,
+          observability: logger ? { logger } : undefined,
+        }),
     };
 
     return this.context;
@@ -435,6 +482,36 @@ export class ServiceBootstrap {
     exitCode = 1,
   ): Promise<GracefulShutdownResult> {
     return this.getShutdownManager().shutdown(reason, exitCode);
+  }
+
+  private buildEventStore(options: {
+    firestore: Firestore;
+    database: Database;
+    outbox?: Outbox;
+    logger?: BootstrapLogger;
+  }): EventStore {
+    const resolvedConfig = this.resolveConfig();
+    const { firestore, database, outbox, logger } = options;
+
+    const override = resolvedConfig._testOverrides?.eventStore;
+    if (override) {
+      return override;
+    }
+
+    const hooks = outbox
+      ? withOutboxRecord(outbox, resolvedConfig.eventStore.hooks)
+      : resolvedConfig.eventStore.hooks;
+
+    const eventStore = createEventStore({
+      firestore,
+      database,
+      projections: resolvedConfig.projections,
+      collections: resolvedConfig.eventStore.collections,
+      hooks,
+      logger,
+    });
+
+    return outbox ? withPublishAfterCommit(eventStore, outbox) : eventStore;
   }
 
   private getLogger(): BootstrapLogger | undefined {
@@ -566,6 +643,8 @@ export class ServiceBootstrap {
         autoCreateResources: this.config.pubsub?.autoCreateResources ?? true,
         cleanupOnClose: this.config.pubsub?.cleanupOnClose ?? false,
         closePubSubClient: this.config.pubsub?.closePubSubClient ?? true,
+        publishTimeoutMs:
+          this.config.pubsub?.publishTimeoutMs ?? DEFAULT_PUBLISH_TIMEOUT_MS,
       },
       observability,
       projections: this.config.projections ?? [],
@@ -586,6 +665,18 @@ export class ServiceBootstrap {
       eventStore: {
         collections: this.config.eventStore?.collections,
         hooks: this.config.eventStore?.hooks,
+      },
+      outbox: this.config.outbox
+        ? {
+            ...this.config.outbox,
+            collection:
+              this.config.outbox.collection ?? `${resolvedServiceName}-outbox`,
+          }
+        : undefined,
+      inbox: {
+        ...this.config.inbox,
+        collection:
+          this.config.inbox?.collection ?? `${resolvedServiceName}-inbox`,
       },
       _testOverrides: this.config._testOverrides,
     };
@@ -645,6 +736,12 @@ export class ServiceBootstrap {
         name: 'firebaseApp',
         close: () => options.firebaseApp.delete(),
       });
+    }
+
+    // Last, so the spans of the other shutdown tasks are flushed too
+    const stopTracing = getTracingShutdown();
+    if (stopTracing) {
+      shutdownManager.register({ name: 'tracing', close: stopTracing });
     }
   }
 

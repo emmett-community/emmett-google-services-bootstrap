@@ -230,4 +230,34 @@ void describe('ServiceBootstrap message bus wiring - unit', () => {
     assert.equal(error.message, 'Failed to publish message');
     assert.equal(error.context.err, failure);
   });
+
+  const publishOptionsOf = async (
+    config: Partial<ServiceBootstrapConfig> = {},
+  ) => {
+    const pubsub = new InMemoryPubSub();
+    const topic = pubsub.topic.bind(pubsub);
+    const options: unknown[] = [];
+    pubsub.topic = (name: string, publishOptions?: unknown) => {
+      if (name === 'orders-evt-OrderCreated') options.push(publishOptions);
+      return topic(name);
+    };
+    const ctx = await createBootstrap(pubsub, config).initialize();
+
+    await ctx.messageBus.publish({ type: 'OrderCreated', data: {} });
+    await ctx.messageBus.close();
+    return options;
+  };
+
+  void it('limits each client call of a publication to 10 seconds by default', async () => {
+    assert.deepEqual(await publishOptionsOf(), [
+      { gaxOpts: { timeout: 10000 } },
+    ]);
+  });
+
+  void it('uses the configured publish timeout', async () => {
+    assert.deepEqual(
+      await publishOptionsOf({ pubsub: { publishTimeoutMs: 2000 } }),
+      [{ gaxOpts: { timeout: 2000 } }],
+    );
+  });
 });

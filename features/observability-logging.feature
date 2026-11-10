@@ -25,6 +25,17 @@ Feature: Observability and Logging
     Then I should be able to trace related operations together
     And I should see the sequence of events clearly
 
+  Scenario: One trace from a request to the reaction to its event
+    Given tracing is loaded before the service and an exporter is configured
+    When a request records an event that another service reacts to
+    Then the request, the recording of the event, its publication and the reaction are one trace
+    And the calls to the database and to the message broker appear under the step that made them
+
+  Scenario: No tracing without an exporter
+    Given no exporter is configured
+    When the service handles requests
+    Then no spans are recorded or sent
+
   Scenario: Health check availability
     Given the service is running
     When I query the health status

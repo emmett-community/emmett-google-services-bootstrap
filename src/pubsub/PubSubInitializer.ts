@@ -85,7 +85,8 @@ export class PubSubInitializer {
       return this.options._pubsub;
     }
 
-    const pubsub = new PubSub({ projectId });
+    // The client creates its spans only when an OpenTelemetry SDK is registered (see `/tracing`)
+    const pubsub = new PubSub({ projectId, enableOpenTelemetryTracing: true });
 
     safeLog.info(logger, 'PubSub initialized', {
       projectId,
